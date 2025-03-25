@@ -11,17 +11,15 @@ import anonypy
 
 
 class Preprocessing:
-    def __init__(self,parameters=None):
+    def __init__(self,dataset,parameters):
+        self.dataset=dataset.copy()
+        self._dataset_original=dataset.copy()
         self.parameters=parameters
         self.run_preprocess()
 
 
     def run_preprocess(self):
         self.stop=False
-
-        # import dataset
-        self.dataset=self.import_data(self.parameters['filepath'])
-        self._dataset_original=self.dataset.copy()
 
         # anonymise specific columns in dataset
         if not self.stop and 'anonymiser' in self.parameters.keys():
@@ -55,13 +53,6 @@ class Preprocessing:
                 'X_test' : self._X_test_scaled,
                 'y_train': self._y_train, 
                 'y_test': self._y_test}
-
-    def import_data(self,filepath):
-        try : 
-            return pd.read_csv(filepath)
-        except FileNotFoundError:
-            self.stop=True
-            print('File not found, please check filepath')
     
     def get_dummies(self,dataset,multicategorical_features):
         return pd.get_dummies(dataset,columns=multicategorical_features,dtype=int)
@@ -151,7 +142,8 @@ class Classification:
         return pd.DataFrame({str(self.model):self.metrics_results}).T
     
 class GridSearch:
-    def __init__(self,gs_parameters,model):
+    def __init__(self,dataset,gs_parameters,model):
+        self.dataset=dataset
         self.gs_parameters=gs_parameters
         self.model=model
         self.run_gs()
@@ -159,7 +151,7 @@ class GridSearch:
     def run_gs(self):
         self.gs_results={}
         for key in self.gs_parameters:
-            pp=Preprocessing(self.gs_parameters[key])
+            pp=Preprocessing(self.dataset,self.gs_parameters[key])
             knn = KNeighborsClassifier(n_neighbors=15,n_jobs=-1)
             model=Classification(pp.preprocess_dataset,knn)
             self.gs_results[str(key)]=model.metrics_results
@@ -190,11 +182,10 @@ class GridSearch:
         plt.show()
 
 
-def generate_preprocess_parameters(filepath,target,multicategorical_features,continuous_features,
+def generate_preprocess_parameters(target,multicategorical_features,continuous_features,
                                    anonymiser_feature_columns=None,anonymiser_k=None,random_state=41,test_size=0.3):
 
     preprocess_parameters= {
-            'filepath':filepath,
             'features':{
                     'target':target,
                     'multicategorical_features' : multicategorical_features,
@@ -213,12 +204,12 @@ def generate_preprocess_parameters(filepath,target,multicategorical_features,con
             }
     return preprocess_parameters
 
-def generate_gs_preprocess_parameters(gs_parameters,filepath,target,multicategorical_features,continuous_features,
+def generate_gs_preprocess_parameters(gs_parameters,target,multicategorical_features,continuous_features,
                                    anonymiser_feature_columns=None,anonymiser_k=None,random_state=41,test_size=0.3):
     gs_preprocess_parameters={}
     if anonymiser_k==None:
         for anonymiser_k in gs_parameters['anonymiser_k']:
-            gs_preprocess_parameters[anonymiser_k]=generate_preprocess_parameters(filepath,target,multicategorical_features,continuous_features,
+            gs_preprocess_parameters[anonymiser_k]=generate_preprocess_parameters(target,multicategorical_features,continuous_features,
                                                                                 anonymiser_feature_columns,anonymiser_k)
     else : 
         print("please remove anonymiser_k for permanent value")
